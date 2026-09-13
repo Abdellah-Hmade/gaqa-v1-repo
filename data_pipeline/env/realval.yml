@@ -1,0 +1,24 @@
+# GAQA real-data external validation environment
+# Channels: conda-forge (priority), bioconda, defaults
+# Install via micromamba: micromamba create -f env/realval.yml
+name: realval
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - bc>=1.07
+  - spades>=3.15.0
+  - megahit>=1.2.9
+  - flye>=2.9
+  - quast>=5.0.2
+  - busco>=5.4.0
+  - checkm-genome>=1.2.0
+  - seqtk>=1.3
+  - seqkit>=2.3.0
+  - parallel>=20201122
+  - wget>=1.20
+  - pip
+  - pip:
+    - numpy>=1.21

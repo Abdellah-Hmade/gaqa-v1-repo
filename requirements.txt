@@ -1,0 +1,8 @@
+torch>=2.3
+transformers>=4.47
+accelerate>=0.30       # required to load the quantized BitNet model
+datasets>=2.20
+scikit-learn>=1.4
+bitsandbytes>=0.43        # optional: adamw_8bit on GPU
+requests>=2.31
+tqdm>=4.66

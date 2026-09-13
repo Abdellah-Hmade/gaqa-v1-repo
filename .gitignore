@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-test/
+venv/
+
+# Outputs / caches
+data_cache/
+outputs/
+
+# Data-pipeline generated artifacts (seed manifest.csv is kept)
+data_pipeline/tools/
+data_pipeline/data/realval_v3/
+data_pipeline/data/processed_gaqa_v3/
+data_pipeline/data/realval_v3_heldout/
+data_pipeline/data/gaqa_knowledge/
+data_pipeline/data/realval/conditions.csv
+data_pipeline/data/realval/subsampled/
+data_pipeline/data/realval/reads/
+data_pipeline/data/realval/references/
+data_pipeline/data/realval/assemblies/
+data_pipeline/data/realval/qc_results/
+data_pipeline/data/realval/checkm_data/
+data_pipeline/data/realval/.state/
+data_pipeline/data/realval/test.jsonl
