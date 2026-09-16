@@ -46,10 +46,24 @@ DATA_FILES = {
 DATA_DIR = _get("GAQA_DATA_DIR", None)  # optional local dir with gaqa_v1_*.jsonl
 
 # --- models (Hugging Face) ------------------------------------------------
-BITNET_MODEL = _get("BITNET_MODEL", "microsoft/bitnet-b1.58-2B-4T")
+BITNET_MODEL = _get("BITNET_MODEL", "microsoft/bitnet-b1.58-2B-4T-bf16")
 MISTRAL_MODEL = _get("MISTRAL_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
 QWEN_MODEL = _get("QWEN_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 HF_TOKEN = _get("HF_TOKEN", None)  # required for gated models (e.g. Mistral)
+
+# Chat template used for evaluation (matches the paper's protocol / Llama-3
+# special-token layout; the base BitNet tokenizer ships a different default).
+CHAT_TEMPLATE = (
+    "{% for message in messages %}"
+    "{% if message['role'] == 'user' %}"
+    "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
+    "{{ message['content'] }}<|eot_id|>"
+    "<|start_header_id|>assistant<|end_header_id|>\n\n"
+    "{% elif message['role'] == 'assistant' %}"
+    "{{ message['content'] }}<|eot_id|>\n"
+    "{% endif %}"
+    "{% endfor %}"
+)
 
 # --- fine-tuning protocol -------------------------------------------------
 SEED = _get("SEED", 42, int)

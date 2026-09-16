@@ -40,7 +40,7 @@ Each step below emits a number that appears in the paper. The mapping:
 | Dataset statistics | `load_jsonl` counts (Step 4) | 11,043 train / 124 val / 114 heldout / 181 knowledge |
 | Training dynamics | `python train.py` (Step 5) | 210 layers, 372M params (15.15%), 4,143 steps, loss 0.007 / val 0.040 |
 | Eval — zero-shot BitNet | `python eval.py --split heldout` (Step 6) | 34.2% heldout, 68.5% knowledge |
-| Eval — **BitNet v1** (ours) | `python eval.py --adapter ...` (Step 6) | **69.3%** heldout, **84.0%** knowledge |
+| Eval — **BitNet v1** (ours) | `python eval.py --packed --adapter ...` (Step 6) | **69.3%** heldout, **84.0%** knowledge |
 | Eval — baselines | `python eval.py --model ...` (Step 6) | Mistral 39.5% / 84.5%; Qwen 54.4% / 94.5% |
 | Per-family + AUC | `python eval.py --per-family` (Step 6) | tool_sel 100%, qc AUC 0.959, remediation 39.5% |
 | Full comparison table | `python benchmark.py` (Step 7) | `outputs/multi_model_comparison.csv` |
@@ -66,9 +66,11 @@ python train.py --max-steps 2 --max-train-samples 8 --batch-size 1 --device cpu
 # 5. Fine-tune (paper numbers — A100 80 GB, ~35 min)
 python train.py
 
-# 6. Evaluate
-python eval.py --split heldout --adapter outputs/gaqa-v1-lora/lora_weights.pt
-python eval.py --split knowledge --adapter outputs/gaqa-v1-lora/lora_weights.pt
+# 6. Evaluate (packed model → the paper's exact 69.3% / 84.0%)
+python eval.py --split heldout --packed --packed-weights packed_weights.pt \
+    --adapter outputs/gaqa-v1-lora
+python eval.py --split knowledge --packed --packed-weights packed_weights.pt \
+    --adapter outputs/gaqa-v1-lora
 
 # 7. Full benchmark table
 python benchmark.py --adapter outputs/gaqa-v1-lora/lora_weights.pt
@@ -298,12 +300,24 @@ Adapter → `outputs/gaqa-v1-lora/lora_weights.pt`.
 ## Step 6 — Evaluate a single model
 
 ```bash
-python eval.py --split heldout                              # zero-shot BitNet → ~34.2%
-python eval.py --split heldout --adapter outputs/gaqa-v1-lora/lora_weights.pt  # → ~69.3%
-python eval.py --split knowledge --adapter outputs/gaqa-v1-lora/lora_weights.pt # → ~84.0%
-python eval.py --split heldout --model Qwen/Qwen2.5-7B-Instruct                # → ~54.4%
+# zero-shot BitNet (bf16) → ~34.2%
+python eval.py --split heldout
+
+# fine-tuned BitNet v1 — packed model (paper's exact 69.3% / 84.0%)
+python eval.py --split heldout --packed --packed-weights packed_weights.pt \
+    --adapter /path/to/adapter_dir
+python eval.py --split knowledge --packed --packed-weights packed_weights.pt \
+    --adapter /path/to/adapter_dir
+
+# baselines
+python eval.py --split heldout --model Qwen/Qwen2.5-7B-Instruct   # → ~54.4%
 ```
 
+- **Packed vs bf16:** the paper's 69.3% is measured on the **packed (offline-ternary)
+  model** (~1.22 GB). Use `--packed` with `--packed-weights` (the packed ternary base)
+  and `--adapter` (the adapter *directory* containing `lora_weights.pt`) to reproduce it
+  exactly. Loading the bf16 model with `--adapter` alone (no `--packed`) gives a higher
+  number (~81.6%) because online quantization is more accurate than the packed deployment.
 - The `--adapter` lines require the adapter from [Step 5](#step-5--fine-tune-bitnet).
 - The zero-shot `--split heldout` line runs on an 8 GB GPU (≈5.5 GB peak); on
   CPU add `--device cpu`.
@@ -379,6 +393,7 @@ AUC **0.959**, remediation **39.5%**. Deltas: +35.1 pp over zero-shot heldout,
 config.py            reads .env / env vars (paper defaults)
 data_utils.py        Zenodo download + JSONL loading + gold/option parsing
 bitnet_lora.py       STE quantization, LoRAAutoBitLinear, adapter apply
+packed_model.py      packed (offline-ternary) BitNet + LoRA loading
 train.py             LoRA + STE fine-tuning (completion-only loss)
 eval.py              logit-based MCQ evaluation (+ per-family, qc AUC)
 benchmark.py         multi-model comparison → CSV

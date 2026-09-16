@@ -15,6 +15,7 @@ Usage:
 import argparse
 import json
 import re
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -24,6 +25,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitNetForCausalLM
 import config
 from bitnet_lora import replace_with_lora, apply_adapter
 from data_utils import load_jsonl, gold_letter, acceptable_letter
+from packed_model import load_packed_model
 
 LETTERS = ["A", "B", "C", "D"]
 
@@ -31,6 +33,7 @@ LETTERS = ["A", "B", "C", "D"]
 def load_model(model_id, adapter=None, device="cuda"):
     tokenizer = AutoTokenizer.from_pretrained(model_id, token=config.HF_TOKEN)
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.chat_template = config.CHAT_TEMPLATE
     is_bitnet = "bitnet" in model_id.lower()
     cls = BitNetForCausalLM if is_bitnet else AutoModelForCausalLM
     model = cls.from_pretrained(model_id, torch_dtype=torch.bfloat16, token=config.HF_TOKEN)
@@ -44,10 +47,32 @@ def load_model(model_id, adapter=None, device="cuda"):
     return model, tokenizer
 
 
+def _letter_token_ids(tokenizer):
+    """Candidate token IDs per letter, covering tokenizer variants."""
+    ids = {}
+    for L in LETTERS:
+        cand = []
+        for variant in [f" {L}", L, f" {L.lower()}", L.lower()]:
+            cand.append(tokenizer.encode(variant, add_special_tokens=False)[0])
+        ids[L] = cand
+    return ids
+
+
 def predict_batch(model, tokenizer, rows, device, batch_size=16, max_length=1024):
-    """Return (pred_letters, letter_probability dicts) via next-token logits."""
-    prompts = [r["input"] + "\nThe correct answer is" for r in rows]
-    letter_ids = {L: tokenizer(L, add_special_tokens=False)["input_ids"][-1] for L in LETTERS}
+    """Return (pred_letters, letter_probability dicts) via next-token logits.
+
+    Protocol matches the paper: each question is wrapped in the chat template and
+    prefilled with ``The correct answer is``; each letter's score is the max
+    logit over its token variants, softmaxed across the four letters.
+    """
+    prompts = [
+        tokenizer.apply_chat_template(
+            [{"role": "user", "content": r["input"]}],
+            tokenize=False, add_generation_prompt=True,
+        ) + "The correct answer is"
+        for r in rows
+    ]
+    letter_ids = _letter_token_ids(tokenizer)
     preds, probs = [], []
     with torch.no_grad():
         for i in range(0, len(prompts), batch_size):
@@ -60,9 +85,11 @@ def predict_batch(model, tokenizer, rows, device, batch_size=16, max_length=1024
             lens = attn.sum(dim=1) - 1
             for j in range(len(chunk)):
                 v = logits[j, lens[j].item()].float()
-                p = torch.softmax(v, dim=-1)
-                pv = {L: p[letter_ids[L]].item() for L in LETTERS}
-                preds.append(max(LETTERS, key=lambda L: pv[L]))
+                ll = {L: v[letter_ids[L]].max().item() for L in LETTERS}
+                vals = torch.tensor([ll[L] for L in LETTERS], device=device)
+                p = torch.softmax(vals, dim=0)
+                pv = {L: p[k].item() for k, L in enumerate(LETTERS)}
+                preds.append(max(LETTERS, key=lambda L: ll[L]))
                 probs.append(pv)
     return preds, probs
 
@@ -99,6 +126,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=config.BITNET_MODEL)
     ap.add_argument("--adapter", default=None)
+    ap.add_argument("--packed", action="store_true",
+                    help="load the packed (offline-ternary) model instead of bf16")
+    ap.add_argument("--packed-weights", default="packed_weights.pt",
+                    help="path to packed_weights.pt (used with --packed)")
     ap.add_argument("--split", choices=["heldout", "knowledge"], required=True)
     ap.add_argument("--data-dir", default=None,
                     help="local data dir (else chosen by DATA_SOURCE in .env)")
@@ -108,7 +139,14 @@ def main():
     ap.add_argument("--device", default=config.DEVICE)
     args = ap.parse_args()
 
-    model, tokenizer = load_model(args.model, args.adapter, args.device)
+    if args.packed:
+        adapter_dir = args.adapter or "."
+        if not Path(adapter_dir).is_dir():
+            adapter_dir = str(Path(adapter_dir).parent)
+        model, tokenizer = load_packed_model(args.packed_weights, adapter_dir,
+                                             args.device)
+    else:
+        model, tokenizer = load_model(args.model, args.adapter, args.device)
     res = evaluate(model, tokenizer, args.split, args.device,
                    batch_size=args.batch_size, per_family=args.per_family,
                    max_samples=args.max_samples, data_dir=args.data_dir)
