@@ -9,6 +9,7 @@ LoRA adapter, console metrics, and a CSV results table.
 |---|---|
 | Dataset (GAQA v1) | Zenodo [10.5281/zenodo.21762025](https://doi.org/10.5281/zenodo.21762025) (auto-downloaded, CC BY 4.0) |
 | Base model | `microsoft/bitnet-b1.58-2B-4T` (Hugging Face) |
+| Fine-tuned model | [hmd377/genome-assembly-general-purpose-ft-bitnet-2b](https://huggingface.co/hmd377/genome-assembly-general-purpose-ft-bitnet-2b) · DOI [10.5281/zenodo.22760608](https://doi.org/10.5281/zenodo.22760608) |
 | Method | LoRA (r=32, α=64, dropout 0.05) over frozen ternary layers; STE; **completion-only loss**; **logit-based forced-choice MCQ** |
 | Paper hardware | Single A100 80 GB |
 
@@ -410,3 +411,4 @@ scripts/build_local_dataset.py
 ## License
 
 Code: MIT. Dataset: CC BY 4.0 (Zenodo 10.5281/zenodo.21762025).
+Fine-tuned model: Zenodo 10.5281/zenodo.22760608.
