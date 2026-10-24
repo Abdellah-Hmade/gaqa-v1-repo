@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.venv-test/
+venv/
+data/
+data_cache/
+outputs/
+data_pipeline/
