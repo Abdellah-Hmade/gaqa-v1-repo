@@ -1,0 +1,36 @@
+# environments
+venv/
+.venv/
+.venv-*/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# secrets / local config
+.env
+.env.*
+!.env.example
+*.key
+*secret*
+
+# runtime outputs
+results/
+results-*/
+logs/
+logs-*/
+models/
+models-*/
+data/
+data_cache/
+outputs/
+paper/
+archive/
+old-models/
+models-*/
+old-logs/
+*.log
+*.png
+*.pt
+*.pth
